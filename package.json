@@ -163,7 +163,7 @@
   "devDependencies": {
     "@libp2p/interface-compliance-tests": "^2.0.0",
     "@libp2p/peer-id-factory": "^1.0.0",
-    "@libp2p/utils": "^1.0.9",
+    "@libp2p/utils": "^2.0.0",
     "aegir": "^37.0.7",
     "datastore-core": "^7.0.1",
     "p-defer": "^4.0.0",
