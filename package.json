@@ -164,7 +164,7 @@
   "devDependencies": {
     "@libp2p/interface-compliance-tests": "^3.0.1",
     "@libp2p/peer-id-factory": "^1.0.0",
-    "@libp2p/utils": "^2.0.0",
+    "@libp2p/utils": "^3.0.0",
     "aegir": "^37.4.0",
     "datastore-core": "^7.0.1",
     "delay": "^5.0.0",
