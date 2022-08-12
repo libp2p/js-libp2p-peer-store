@@ -171,7 +171,7 @@
     "@libp2p/peer-id-factory": "^1.0.0",
     "@libp2p/utils": "^3.0.0",
     "aegir": "^37.4.0",
-    "datastore-core": "^7.0.1",
+    "datastore-core": "^8.0.1",
     "delay": "^5.0.0",
     "p-defer": "^4.0.0",
     "p-wait-for": "^5.0.0",
