@@ -68,14 +68,14 @@
 <a href="#install" id="install" style="color: inherit; text-decoration: none;">
   <h2>Install</h2>
 </a>
-<pre><code class="language-console">$ npm i @libp2p/peer-store
+<pre><code class="language-console"><span class="hl-0">$ </span><span class="hl-1">npm</span><span class="hl-0"> </span><span class="hl-1">i</span><span class="hl-0"> </span><span class="hl-1">@libp2p/peer-store</span>
 </code></pre>
 
 <a href="#browser-ltscriptgt-tag" id="browser-ltscriptgt-tag" style="color: inherit; text-decoration: none;">
   <h3>Browser <code>&lt;script&gt;</code> tag</h3>
 </a>
 <p>Loading this module through a script tag will make it&#39;s exports available as <code>Libp2pPeerStore</code> in the global namespace.</p>
-<pre><code class="language-html"><span class="hl-0">&lt;</span><span class="hl-1">script</span><span class="hl-2"> </span><span class="hl-3">src</span><span class="hl-2">=</span><span class="hl-4">&quot;https://unpkg.com/@libp2p/peer-store/dist/index.min.js&quot;</span><span class="hl-0">&gt;&lt;/</span><span class="hl-1">script</span><span class="hl-0">&gt;</span>
+<pre><code class="language-html"><span class="hl-2">&lt;</span><span class="hl-3">script</span><span class="hl-4"> </span><span class="hl-5">src</span><span class="hl-4">=</span><span class="hl-6">&quot;https://unpkg.com/@libp2p/peer-store/dist/index.min.js&quot;</span><span class="hl-2">&gt;&lt;/</span><span class="hl-3">script</span><span class="hl-2">&gt;</span>
 </code></pre>
 
 <a href="#description" id="description" style="color: inherit; text-decoration: none;">
@@ -162,7 +162,7 @@
 <p>The <code>addressBook</code> keeps the known multiaddrs of a peer. The multiaddrs of each peer may change over time and the Address Book must account for this.</p>
 <p><code>Map&lt;string, Address&gt;</code></p>
 <p>A <code>peerId.toString()</code> identifier mapping to a <code>Address</code> object, which should have the following structure:</p>
-<pre><code class="language-js"><span class="hl-5">{</span><br/><span class="hl-5">  </span><span class="hl-6">multiaddr</span><span class="hl-5">: </span><span class="hl-0">&lt;</span><span class="hl-7">Multiaddr</span><span class="hl-0">&gt;</span><br/><span class="hl-5">}</span>
+<pre><code class="language-js"><span class="hl-0">{</span><br/><span class="hl-0">  </span><span class="hl-7">multiaddr</span><span class="hl-0">: </span><span class="hl-2">&lt;</span><span class="hl-8">Multiaddr</span><span class="hl-2">&gt;</span><br/><span class="hl-0">}</span>
 </code></pre>
 
 <a href="#key-book" id="key-book" style="color: inherit; text-decoration: none;">
