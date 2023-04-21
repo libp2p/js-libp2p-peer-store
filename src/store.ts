@@ -148,6 +148,11 @@ export class PersistentStore {
     peer.metadata = sortMapByKeys(peer.metadata)
     peer.tags = sortMapByKeys(peer.tags)
 
+    // Ed25519 and secp256k1 have their public key embedded in them so no need to duplicate it
+    if (peerId.type !== 'RSA') {
+      delete peer.publicKey
+    }
+
     const buf = PeerPB.encode(peer)
 
     if (existingBuf != null && uint8ArrayEquals(buf, existingBuf)) {

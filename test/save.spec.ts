@@ -8,11 +8,12 @@ import pDefer from 'p-defer'
 import { MemoryDatastore } from 'datastore-core/memory'
 import { PersistentPeerStore } from '../src/index.js'
 import { codes } from '../src/errors.js'
-import { createEd25519PeerId } from '@libp2p/peer-id-factory'
+import { createEd25519PeerId, createRSAPeerId, createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import { pEvent } from 'p-event'
 import sinon from 'sinon'
 import type { Libp2pEvents, PeerUpdate } from '@libp2p/interface-libp2p'
 import { EventEmitter } from '@libp2p/interfaces/events'
+import { Peer as PeerPB } from '../src/pb/peer.js'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 const addr2 = multiaddr('/ip4/20.0.0.1/tcp/8001')
@@ -172,5 +173,38 @@ describe('save', () => {
     })
 
     expect(spy).to.have.property('callCount', 1)
+  })
+
+  it('should not store a public key if part of peer id', async () => {
+    // @ts-expect-error private fields
+    const spy = sinon.spy(peerStore.store.datastore, 'put')
+
+    if (otherPeerId.publicKey == null) {
+      throw new Error('Public key was missing')
+    }
+
+    const edKey = await createEd25519PeerId()
+    await peerStore.save(edKey, {
+      publicKey: edKey.publicKey
+    })
+
+    const dbPeerEdKey = PeerPB.decode(spy.getCall(0).args[1])
+    expect(dbPeerEdKey).to.not.have.property('publicKey')
+
+    const secpKey = await createSecp256k1PeerId()
+    await peerStore.save(secpKey, {
+      publicKey: secpKey.publicKey
+    })
+
+    const dbPeerSecpKey = PeerPB.decode(spy.getCall(1).args[1])
+    expect(dbPeerSecpKey).to.not.have.property('publicKey')
+
+    const rsaKey = await createRSAPeerId()
+    await peerStore.save(rsaKey, {
+      publicKey: rsaKey.publicKey
+    })
+
+    const dbPeerRsaKey = PeerPB.decode(spy.getCall(2).args[1])
+    expect(dbPeerRsaKey).to.have.property('publicKey').that.equalBytes(rsaKey.publicKey)
   })
 })
