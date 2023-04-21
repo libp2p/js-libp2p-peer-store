@@ -71,12 +71,12 @@ export class PersistentStore {
     const peer = toDatastorePeer(peerId, data)
 
     const peerPb: PeerPB = {
-      addresses: dedupeAddresses(...(peer.addresses ?? existingPeer?.addresses ?? [])),
-      protocols: [...new Set(peer.protocols ?? existingPeer?.protocols)],
+      addresses: dedupeAddresses(...((data.addresses != null || data.multiaddrs != null) ? peer.addresses : (existingPeer?.addresses ?? []))),
+      protocols: (data.protocols != null) ? [...new Set(peer.protocols)] : [...new Set(existingPeer?.protocols)],
       publicKey: peer.publicKey ?? existingPeer?.id.publicKey,
       peerRecordEnvelope: peer.peerRecordEnvelope ?? existingPeer?.peerRecordEnvelope,
-      metadata: peer.metadata ?? existingPeer?.metadata,
-      tags: peer.tags ?? existingPeer?.tags
+      metadata: data.metadata != null ? peer.metadata : existingPeer?.metadata ?? new Map(),
+      tags: data.tags != null ? peer.tags : existingPeer?.tags ?? new Map()
     }
 
     return await this.#saveIfDifferent(peerId, peerPb, existingBuf, existingPeer)

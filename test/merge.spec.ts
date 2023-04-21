@@ -60,11 +60,14 @@ describe('merge', () => {
       },
       tags: {
         tag1: { value: 10 }
-      }
+      },
+      protocols: [
+        '/foo/bar'
+      ],
+      peerRecordEnvelope: Uint8Array.from([3, 4, 5])
     }
 
-    await peerStore.save(otherPeerId, peer)
-
+    const original = await peerStore.save(otherPeerId, peer)
     const updated = await peerStore.merge(otherPeerId, {
       multiaddrs: [
         addr3
@@ -81,6 +84,12 @@ describe('merge', () => {
       multiaddr: addr2,
       isCertified: false
     }])
+
+    // other fields should be untouched
+    expect(updated).to.have.property('metadata').that.deep.equals(original.metadata)
+    expect(updated).to.have.property('tags').that.deep.equals(original.tags)
+    expect(updated).to.have.property('protocols').that.deep.equals(original.protocols)
+    expect(updated).to.have.property('peerRecordEnvelope').that.deep.equals(original.peerRecordEnvelope)
   })
 
   it('merges metadata', async () => {
@@ -94,18 +103,19 @@ describe('merge', () => {
       },
       tags: {
         tag1: { value: 10 }
-      }
+      },
+      protocols: [
+        '/foo/bar'
+      ],
+      peerRecordEnvelope: Uint8Array.from([3, 4, 5])
     }
 
-    await peerStore.save(otherPeerId, peer)
-
-    const peerUpdate: PeerData = {
+    const original = await peerStore.save(otherPeerId, peer)
+    const updated = await peerStore.merge(otherPeerId, {
       metadata: {
         bar: Uint8Array.from([3, 4, 5])
       }
-    }
-
-    const updated = await peerStore.merge(otherPeerId, peerUpdate)
+    })
 
     expect(updated).to.have.property('metadata').that.deep.equals(
       new Map([
@@ -113,6 +123,12 @@ describe('merge', () => {
         ['bar', Uint8Array.from([3, 4, 5])]
       ])
     )
+
+    // other fields should be untouched
+    expect(updated).to.have.property('addresses').that.deep.equals(original.addresses)
+    expect(updated).to.have.property('tags').that.deep.equals(original.tags)
+    expect(updated).to.have.property('protocols').that.deep.equals(original.protocols)
+    expect(updated).to.have.property('peerRecordEnvelope').that.deep.equals(original.peerRecordEnvelope)
   })
 
   it('merges tags', async () => {
@@ -126,18 +142,19 @@ describe('merge', () => {
       },
       tags: {
         tag1: { value: 10 }
-      }
+      },
+      protocols: [
+        '/foo/bar'
+      ],
+      peerRecordEnvelope: Uint8Array.from([3, 4, 5])
     }
 
-    await peerStore.patch(otherPeerId, peer)
-
-    const peerUpdate: PeerData = {
+    const original = await peerStore.patch(otherPeerId, peer)
+    const updated = await peerStore.merge(otherPeerId, {
       tags: {
         tag2: { value: 20 }
       }
-    }
-
-    const updated = await peerStore.merge(otherPeerId, peerUpdate)
+    })
 
     expect(updated).to.have.property('tags').that.deep.equals(
       new Map([
@@ -145,5 +162,45 @@ describe('merge', () => {
         ['tag2', { value: 20 }]
       ])
     )
+
+    // other fields should be untouched
+    expect(updated).to.have.property('addresses').that.deep.equals(original.addresses)
+    expect(updated).to.have.property('metadata').that.deep.equals(original.metadata)
+    expect(updated).to.have.property('protocols').that.deep.equals(original.protocols)
+    expect(updated).to.have.property('peerRecordEnvelope').that.deep.equals(original.peerRecordEnvelope)
+  })
+
+  it('merges peer record envelope', async () => {
+    const peer: PeerData = {
+      multiaddrs: [
+        addr1,
+        addr2
+      ],
+      metadata: {
+        foo: Uint8Array.from([0, 1, 2])
+      },
+      tags: {
+        tag1: { value: 10 }
+      },
+      protocols: [
+        '/foo/bar'
+      ],
+      peerRecordEnvelope: Uint8Array.from([3, 4, 5])
+    }
+
+    const original = await peerStore.save(otherPeerId, peer)
+    const updated = await peerStore.merge(otherPeerId, {
+      peerRecordEnvelope: Uint8Array.from([6, 7, 8])
+    })
+
+    expect(updated).to.have.property('peerRecordEnvelope').that.deep.equals(
+      Uint8Array.from([6, 7, 8])
+    )
+
+    // other fields should be untouched
+    expect(updated).to.have.property('addresses').that.deep.equals(original.addresses)
+    expect(updated).to.have.property('metadata').that.deep.equals(original.metadata)
+    expect(updated).to.have.property('tags').that.deep.equals(original.tags)
+    expect(updated).to.have.property('protocols').that.deep.equals(original.protocols)
   })
 })

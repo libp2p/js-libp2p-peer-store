@@ -14,6 +14,7 @@ import sinon from 'sinon'
 import type { Libp2pEvents, PeerUpdate } from '@libp2p/interface-libp2p'
 import { EventEmitter } from '@libp2p/interfaces/events'
 import { Peer as PeerPB } from '../src/pb/peer.js'
+import type { PeerData } from '@libp2p/interface-peer-store'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 const addr2 = multiaddr('/ip4/20.0.0.1/tcp/8001')
@@ -206,5 +207,46 @@ describe('save', () => {
 
     const dbPeerRsaKey = PeerPB.decode(spy.getCall(2).args[1])
     expect(dbPeerRsaKey).to.have.property('publicKey').that.equalBytes(rsaKey.publicKey)
+  })
+
+  it('saves all of the fields', async () => {
+    const peer: PeerData = {
+      multiaddrs: [
+        addr1,
+        addr2
+      ],
+      metadata: {
+        foo: Uint8Array.from([0, 1, 2])
+      },
+      tags: {
+        tag1: { value: 10 }
+      },
+      protocols: [
+        '/foo/bar'
+      ],
+      peerRecordEnvelope: Uint8Array.from([3, 4, 5])
+    }
+
+    const saved = await peerStore.save(otherPeerId, peer)
+
+    expect(saved).to.have.property('addresses').that.deep.equals([{
+      multiaddr: addr1,
+      isCertified: false
+    }, {
+      multiaddr: addr2,
+      isCertified: false
+    }])
+    expect(saved).to.have.property('metadata').that.deep.equals(
+      new Map([
+        ['foo', Uint8Array.from([0, 1, 2])]
+      ])
+    )
+    expect(saved).to.have.property('tags').that.deep.equals(
+      new Map([
+        ['tag1', { value: 10 }]
+      ])
+    )
+    expect(saved).to.have.property('protocols').that.deep.equals(peer.protocols)
+    expect(saved).to.have.property('peerRecordEnvelope').that.deep.equals(peer.peerRecordEnvelope)
   })
 })
