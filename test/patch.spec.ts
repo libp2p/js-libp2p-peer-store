@@ -9,6 +9,8 @@ import { PersistentPeerStore } from '../src/index.js'
 import { createEd25519PeerId } from '@libp2p/peer-id-factory'
 import type { PeerData } from '@libp2p/interface-peer-store'
 import { pEvent } from 'p-event'
+import { EventEmitter } from '@libp2p/interfaces/events'
+import type { Libp2pEvents } from '@libp2p/interface-libp2p'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 const addr2 = multiaddr('/ip4/20.0.0.1/tcp/8001')
@@ -18,15 +20,17 @@ describe('patch', () => {
   let peerId: PeerId
   let otherPeerId: PeerId
   let peerStore: PersistentPeerStore
+  let events: EventEmitter<Libp2pEvents>
 
   beforeEach(async () => {
     peerId = await createEd25519PeerId()
     otherPeerId = await createEd25519PeerId()
-    peerStore = new PersistentPeerStore({ peerId, datastore: new MemoryDatastore() })
+    events = new EventEmitter()
+    peerStore = new PersistentPeerStore({ peerId, events, datastore: new MemoryDatastore() })
   })
 
   it('emits peer:update event on patch', async () => {
-    const eventPromise = pEvent(peerStore, 'peer:update')
+    const eventPromise = pEvent(events, 'peer:update')
 
     await peerStore.patch(otherPeerId, {
       multiaddrs: [addr1, addr2]
@@ -36,7 +40,7 @@ describe('patch', () => {
   })
 
   it('emits self:peer:update event on patch for self peer', async () => {
-    const eventPromise = pEvent(peerStore, 'self:peer:update')
+    const eventPromise = pEvent(events, 'self:peer:update')
 
     await peerStore.patch(peerId, {
       multiaddrs: [addr1, addr2]

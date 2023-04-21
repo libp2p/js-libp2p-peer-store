@@ -11,7 +11,8 @@ import { codes } from '../src/errors.js'
 import { createEd25519PeerId } from '@libp2p/peer-id-factory'
 import { pEvent } from 'p-event'
 import sinon from 'sinon'
-import type { PeerUpdate } from '@libp2p/interface-libp2p'
+import type { Libp2pEvents, PeerUpdate } from '@libp2p/interface-libp2p'
+import { EventEmitter } from '@libp2p/interfaces/events'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 const addr2 = multiaddr('/ip4/20.0.0.1/tcp/8001')
@@ -20,11 +21,13 @@ describe('save', () => {
   let peerId: PeerId
   let otherPeerId: PeerId
   let peerStore: PersistentPeerStore
+  let events: EventEmitter<Libp2pEvents>
 
   beforeEach(async () => {
     peerId = await createEd25519PeerId()
     otherPeerId = await createEd25519PeerId()
-    peerStore = new PersistentPeerStore({ peerId, datastore: new MemoryDatastore() })
+    events = new EventEmitter()
+    peerStore = new PersistentPeerStore({ peerId, events, datastore: new MemoryDatastore() })
   })
 
   it('throws invalid parameters error if invalid PeerId is provided', async () => {
@@ -49,7 +52,7 @@ describe('save', () => {
 
   it('replaces the stored content by default and emit change event', async () => {
     const supportedMultiaddrs = [addr1, addr2]
-    const eventPromise = pEvent(peerStore, 'peer:update')
+    const eventPromise = pEvent(events, 'peer:update')
 
     await peerStore.save(otherPeerId, {
       multiaddrs: supportedMultiaddrs
@@ -75,7 +78,7 @@ describe('save', () => {
     const supportedMultiaddrsB = [addr2]
 
     let changeCounter = 0
-    peerStore.addEventListener('peer:update', () => {
+    events.addEventListener('peer:update', () => {
       changeCounter++
       if (changeCounter > 1) {
         defer.resolve()
@@ -100,7 +103,7 @@ describe('save', () => {
   })
 
   it('emits self event on save for self peer', async () => {
-    const eventPromise = pEvent(peerStore, 'self:peer:update')
+    const eventPromise = pEvent(events, 'self:peer:update')
 
     await peerStore.save(peerId, {
       multiaddrs: [addr1, addr2]
@@ -115,7 +118,7 @@ describe('save', () => {
     const supportedMultiaddrs = [addr1, addr2]
 
     let changeCounter = 0
-    peerStore.addEventListener('peer:update', () => {
+    events.addEventListener('peer:update', () => {
       changeCounter++
       if (changeCounter > 1) {
         defer.reject(new Error('Saved identical data twice'))
@@ -154,7 +157,7 @@ describe('save', () => {
 
   it('should not store a public key if already stored', async () => {
     // @ts-expect-error private fields
-    const spy = sinon.spy(peerStore.store.components.datastore, 'put')
+    const spy = sinon.spy(peerStore.store.datastore, 'put')
 
     if (otherPeerId.publicKey == null) {
       throw new Error('Public key was missing')

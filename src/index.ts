@@ -1,15 +1,15 @@
-import { EventEmitter } from '@libp2p/interfaces/events'
-import { PeerUpdate, PersistentStore } from './store.js'
+import type { EventEmitter } from '@libp2p/interfaces/events'
+import { PersistentStore, PeerUpdate } from './store.js'
 import type { PeerStore, Peer, PeerData } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Datastore } from 'interface-datastore'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import { CodeError } from '@libp2p/interfaces/errors'
-import { codes } from './errors.js'
+import type { Libp2pEvents } from '@libp2p/interface-libp2p'
 
 export interface PersistentPeerStoreComponents {
   peerId: PeerId
   datastore: Datastore
+  events: EventEmitter<Libp2pEvents>
 }
 
 export interface AddressFilter {
@@ -20,61 +20,22 @@ export interface PersistentPeerStoreInit {
   addressFilter?: AddressFilter
 }
 
-interface PeerStoreEvents {
-  /**
-   * This event is emitted when the stored data for a peer changes.
-   *
-   * If the peer store already contained data about the peer it will be set
-   * as the `previous` key on the event detail.
-   *
-   * @example
-   *
-   * ```js
-   * peerStore.addEventListener('peer:update', (event) => {
-   *   const { peer, previous } = event.detail
-   *   // ...
-   * })
-   * ```
-   */
-  'peer:update': CustomEvent<PeerUpdate>
-
-  /**
-   * Similar to the 'peer:update' event, this event is dispatched when the
-   * updated peer is the current node.
-   *
-   * @example
-   *
-   * ```js
-   * peerStore.addEventListener('self:peer:update', (event) => {
-   *   const { peer, previous } = event.detail
-   *   // ...
-   * })
-   * ```
-   */
-  'self:peer:update': CustomEvent<PeerUpdate>
-}
-
 /**
  * An implementation of PeerStore that stores data in a Datastore
  */
-export class PersistentPeerStore extends EventEmitter<PeerStoreEvents> implements PeerStore {
-  private readonly components: PersistentPeerStoreComponents
+export class PersistentPeerStore implements PeerStore {
   private readonly store: PersistentStore
+  private readonly events: EventEmitter<Libp2pEvents>
+  private readonly peerId: PeerId
 
   constructor (components: PersistentPeerStoreComponents, init: PersistentPeerStoreInit = {}) {
-    super()
-
-    this.components = components
+    this.events = components.events
+    this.peerId = components.peerId
     this.store = new PersistentStore(components)
   }
 
   async forEach (fn: (peer: Peer) => void): Promise<void> {
     for await (const peer of this.store.all()) {
-      if (peer.id.equals(this.components.peerId)) {
-        // Skip self peer if present
-        continue
-      }
-
       fn(peer)
     }
   }
@@ -90,10 +51,6 @@ export class PersistentPeerStore extends EventEmitter<PeerStoreEvents> implement
   }
 
   async delete (peerId: PeerId): Promise<void> {
-    if (this.components.peerId.equals(peerId)) {
-      throw new CodeError('Cannot delete self peer', codes.ERR_INVALID_PARAMETERS)
-    }
-
     await this.store.delete(peerId)
   }
 
@@ -134,10 +91,10 @@ export class PersistentPeerStore extends EventEmitter<PeerStoreEvents> implement
       return
     }
 
-    if (this.components.peerId.equals(id)) {
-      this.safeDispatchEvent('self:peer:update', { detail: result })
+    if (this.peerId.equals(id)) {
+      this.events.safeDispatchEvent('self:peer:update', { detail: result })
     } else {
-      this.safeDispatchEvent('peer:update', { detail: result })
+      this.events.safeDispatchEvent('peer:update', { detail: result })
     }
   }
 }

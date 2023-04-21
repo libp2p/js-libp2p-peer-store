@@ -8,6 +8,8 @@ import { MemoryDatastore } from 'datastore-core/memory'
 import { PersistentPeerStore } from '../src/index.js'
 import { createEd25519PeerId } from '@libp2p/peer-id-factory'
 import delay from 'delay'
+import { EventEmitter } from '@libp2p/interfaces/events'
+import type { Libp2pEvents } from '@libp2p/interface-libp2p'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 
@@ -15,11 +17,13 @@ describe('PersistentPeerStore', () => {
   let peerId: PeerId
   let otherPeerId: PeerId
   let peerStore: PersistentPeerStore
+  let events: EventEmitter<Libp2pEvents>
 
   beforeEach(async () => {
     peerId = await createEd25519PeerId()
     otherPeerId = await createEd25519PeerId()
-    peerStore = new PersistentPeerStore({ peerId, datastore: new MemoryDatastore() })
+    events = new EventEmitter()
+    peerStore = new PersistentPeerStore({ peerId, events, datastore: new MemoryDatastore() })
   })
 
   it('has an empty map of peers', async () => {

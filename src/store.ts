@@ -12,33 +12,41 @@ import { dedupeTags } from './utils/dedupe-tags.js'
 import { dedupeMetadata } from './utils/dedupe-metadata.js'
 import { bytesToPeer } from './utils/bytes-to-peer.js'
 import { multiaddr } from '@multiformats/multiaddr'
+import { CodeError } from '@libp2p/interfaces/errors'
+import { codes } from './errors.js'
+import type { Datastore } from 'interface-datastore'
+import type { PeerUpdate as PeerUpdateExternal } from '@libp2p/interface-libp2p'
 
 /**
  * Event detail emitted when peer data changes
  */
-export interface PeerUpdate {
-  peer: Peer
-  previous?: Peer
+export interface PeerUpdate extends PeerUpdateExternal {
   updated: boolean
 }
 
 export class PersistentStore {
-  private readonly components: PersistentPeerStoreComponents
+  private readonly peerId: PeerId
+  private readonly datastore: Datastore
 
   constructor (components: PersistentPeerStoreComponents) {
-    this.components = components
+    this.peerId = components.peerId
+    this.datastore = components.datastore
   }
 
   async has (peerId: PeerId): Promise<boolean> {
-    return await this.components.datastore.has(peerIdToDatastoreKey(peerId))
+    return await this.datastore.has(peerIdToDatastoreKey(peerId))
   }
 
   async delete (peerId: PeerId): Promise<void> {
-    await this.components.datastore.delete(peerIdToDatastoreKey(peerId))
+    if (this.peerId.equals(peerId)) {
+      throw new CodeError('Cannot delete self peer', codes.ERR_INVALID_PARAMETERS)
+    }
+
+    await this.datastore.delete(peerIdToDatastoreKey(peerId))
   }
 
   async load (peerId: PeerId): Promise<Peer> {
-    const buf = await this.components.datastore.get(peerIdToDatastoreKey(peerId))
+    const buf = await this.datastore.get(peerIdToDatastoreKey(peerId))
 
     return await bytesToPeer(peerId, buf)
   }
@@ -94,20 +102,26 @@ export class PersistentStore {
   }
 
   async * all (): AsyncGenerator<Peer, void, unknown> {
-    for await (const { key, value } of this.components.datastore.query({
+    for await (const { key, value } of this.datastore.query({
       prefix: NAMESPACE_COMMON
     })) {
       // /peers/${peer-id-as-libp2p-key-cid-string-in-base-32}
       const base32Str = key.toString().split('/')[2]
       const buf = base32.decode(base32Str)
+      const peerId = peerIdFromBytes(buf)
 
-      yield bytesToPeer(peerIdFromBytes(buf), value)
+      if (peerId.equals(this.peerId)) {
+        // Skip self peer if present
+        continue
+      }
+
+      yield bytesToPeer(peerId, value)
     }
   }
 
   async #findExistingPeer (peerId: PeerId): Promise<{ existingBuf?: Uint8Array, existingPeer?: Peer }> {
     try {
-      const existingBuf = await this.components.datastore.get(peerIdToDatastoreKey(peerId))
+      const existingBuf = await this.datastore.get(peerIdToDatastoreKey(peerId))
       const existingPeer = await bytesToPeer(peerId, existingBuf)
 
       return {
@@ -144,7 +158,7 @@ export class PersistentStore {
       }
     }
 
-    await this.components.datastore.put(peerIdToDatastoreKey(peerId), buf)
+    await this.datastore.put(peerIdToDatastoreKey(peerId), buf)
 
     return {
       peer: await bytesToPeer(peerId, buf),
