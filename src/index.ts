@@ -15,6 +15,9 @@ export interface PersistentPeerStoreComponents {
   events: EventEmitter<Libp2pEvents>
 }
 
+/**
+ * Return true to allow storing the passed multiaddr for the passed peer
+ */
 export interface AddressFilter {
   (peerId: PeerId, multiaddr: Multiaddr): Promise<boolean>
 }
@@ -34,7 +37,7 @@ export class PersistentPeerStore implements PeerStore {
   constructor (components: PersistentPeerStoreComponents, init: PersistentPeerStoreInit = {}) {
     this.events = components.events
     this.peerId = components.peerId
-    this.store = new PersistentStore(components)
+    this.store = new PersistentStore(components, init)
   }
 
   async forEach (fn: (peer: Peer) => void): Promise<void> {

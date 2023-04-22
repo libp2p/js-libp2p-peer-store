@@ -2,14 +2,22 @@
 
 import { expect } from 'aegir/chai'
 import { multiaddr } from '@multiformats/multiaddr'
-import { dedupeAddresses } from '../../src/utils/dedupe-addresses.js'
+import { dedupeFilterAndSortAddresses } from '../../src/utils/dedupe-addresses.js'
+import { createEd25519PeerId } from '@libp2p/peer-id-factory'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
 const addr1 = multiaddr('/ip4/127.0.0.1/tcp/8000')
 const addr2 = multiaddr('/ip4/20.0.0.1/tcp/8001')
 
 describe('dedupe-addresses', () => {
-  it('should dedupe addresses', () => {
-    expect(dedupeAddresses({
+  let peerId: PeerId
+
+  beforeEach(async () => {
+    peerId = await createEd25519PeerId()
+  })
+
+  it('should dedupe addresses', async () => {
+    expect(await dedupeFilterAndSortAddresses(peerId, async () => true, [{
       multiaddr: addr1,
       isCertified: false
     }, {
@@ -18,7 +26,7 @@ describe('dedupe-addresses', () => {
     }, {
       multiaddr: addr2,
       isCertified: false
-    })).to.deep.equal([{
+    }])).to.deep.equal([{
       multiaddr: addr1.bytes,
       isCertified: false
     }, {
@@ -27,8 +35,8 @@ describe('dedupe-addresses', () => {
     }])
   })
 
-  it('should sort addresses', () => {
-    expect(dedupeAddresses({
+  it('should sort addresses', async () => {
+    expect(await dedupeFilterAndSortAddresses(peerId, async () => true, [{
       multiaddr: addr2,
       isCertified: false
     }, {
@@ -37,7 +45,7 @@ describe('dedupe-addresses', () => {
     }, {
       multiaddr: addr1,
       isCertified: false
-    })).to.deep.equal([{
+    }])).to.deep.equal([{
       multiaddr: addr1.bytes,
       isCertified: false
     }, {
@@ -46,30 +54,40 @@ describe('dedupe-addresses', () => {
     }])
   })
 
-  it('should retain isCertified when deduping addresses', () => {
-    expect(dedupeAddresses({
+  it('should retain isCertified when deduping addresses', async () => {
+    expect(await dedupeFilterAndSortAddresses(peerId, async () => true, [{
       multiaddr: addr1,
       isCertified: true
     }, {
       multiaddr: addr1,
       isCertified: false
-    })).to.deep.equal([{
+    }])).to.deep.equal([{
       multiaddr: addr1.bytes,
       isCertified: true
     }])
   })
 
-  it('should survive deduping garbage addresses', () => {
-    expect(dedupeAddresses({
+  it('should survive deduping garbage addresses', async () => {
+    expect(await dedupeFilterAndSortAddresses(peerId, async () => true, [{
       multiaddr: addr1,
       isCertified: false
     // @ts-expect-error invalid params
     }, {}, 'hello', 5, undefined, {
       multiaddr: addr1,
       isCertified: false
-    })).to.deep.equal([{
+    }])).to.deep.equal([{
       multiaddr: addr1.bytes,
       isCertified: false
     }])
+  })
+
+  it('should filter addresses', async () => {
+    expect(await dedupeFilterAndSortAddresses(peerId, async () => false, [{
+      multiaddr: addr1,
+      isCertified: true
+    }, {
+      multiaddr: addr1,
+      isCertified: false
+    }])).to.deep.equal([])
   })
 })

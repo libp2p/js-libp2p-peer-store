@@ -3,15 +3,14 @@ import { base32 } from 'multiformats/bases/base32'
 import { Peer as PeerPB } from './pb/peer.js'
 import type { Peer, PeerData } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { PersistentPeerStoreComponents } from './index.js'
+import type { AddressFilter, PersistentPeerStoreComponents, PersistentPeerStoreInit } from './index.js'
 import { equals as uint8ArrayEquals } from 'uint8arrays/equals'
 import { NAMESPACE_COMMON, peerIdToDatastoreKey } from './utils/peer-id-to-datastore-key.js'
 import { toDatastorePeer } from './utils/peer-data-to-datastore-peer.js'
-import { dedupeAddresses } from './utils/dedupe-addresses.js'
+import { dedupeFilterAndSortAddresses } from './utils/dedupe-addresses.js'
 import { dedupeTags } from './utils/dedupe-tags.js'
 import { dedupeMetadata } from './utils/dedupe-metadata.js'
 import { bytesToPeer } from './utils/bytes-to-peer.js'
-import { multiaddr } from '@multiformats/multiaddr'
 import { CodeError } from '@libp2p/interfaces/errors'
 import { codes } from './errors.js'
 import type { Datastore } from 'interface-datastore'
@@ -29,10 +28,12 @@ export class PersistentStore {
   private readonly peerId: PeerId
   private readonly datastore: Datastore
   public readonly lock: Mortice
+  private readonly addressFilter?: AddressFilter
 
-  constructor (components: PersistentPeerStoreComponents) {
+  constructor (components: PersistentPeerStoreComponents, init: PersistentPeerStoreInit = {}) {
     this.peerId = components.peerId
     this.datastore = components.datastore
+    this.addressFilter = init.addressFilter
     this.lock = mortice({
       name: 'peer-store',
       singleProcess: true
@@ -64,6 +65,7 @@ export class PersistentStore {
     } = await this.#findExistingPeer(peerId)
 
     const peerPb: PeerPB = toDatastorePeer(peerId, data)
+    peerPb.addresses = await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), peerPb.addresses)
 
     return await this.#saveIfDifferent(peerId, peerPb, existingBuf, existingPeer)
   }
@@ -77,7 +79,9 @@ export class PersistentStore {
     const peer = toDatastorePeer(peerId, data)
 
     const peerPb: PeerPB = {
-      addresses: dedupeAddresses(...((data.addresses != null || data.multiaddrs != null) ? peer.addresses : (existingPeer?.addresses ?? []))),
+      addresses: await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), [
+        ...((data.addresses != null || data.multiaddrs != null) ? peer.addresses : (existingPeer?.addresses ?? []))
+      ]),
       protocols: (data.protocols != null) ? [...new Set(peer.protocols)] : [...new Set(existingPeer?.protocols)],
       publicKey: peer.publicKey ?? existingPeer?.id.publicKey,
       peerRecordEnvelope: peer.peerRecordEnvelope ?? existingPeer?.peerRecordEnvelope,
@@ -96,7 +100,10 @@ export class PersistentStore {
 
     const peer = toDatastorePeer(peerId, data)
     const peerPb: PeerPB = {
-      addresses: dedupeAddresses(...(existingPeer?.addresses ?? []), ...peer.addresses),
+      addresses: await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), [
+        ...(existingPeer?.addresses ?? []),
+        ...(peer.addresses ?? [])
+      ]),
       protocols: [...new Set([...(existingPeer?.protocols ?? []), ...peer.protocols])],
       publicKey: peer.publicKey ?? existingPeer?.id.publicKey,
       peerRecordEnvelope: peer.peerRecordEnvelope ?? existingPeer?.peerRecordEnvelope,
@@ -145,9 +152,6 @@ export class PersistentStore {
 
   async #saveIfDifferent (peerId: PeerId, peer: PeerPB, existingBuf?: Uint8Array, existingPeer?: Peer): Promise<PeerUpdate> {
     // sort fields before write so bytes are consistent
-    peer.addresses = peer.addresses.sort((a, b) => {
-      return multiaddr(a.multiaddr).toString().localeCompare(multiaddr(b.multiaddr).toString())
-    })
     peer.protocols = peer.protocols.sort((a, b) => {
       return a.localeCompare(b)
     })

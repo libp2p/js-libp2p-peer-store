@@ -1,13 +1,15 @@
 import { isMultiaddr, multiaddr } from '@multiformats/multiaddr'
 import type { Address as AddressPB } from '../pb/peer.js'
 import type { Address } from '@libp2p/interface-peer-store'
+import type { AddressFilter } from '../index.js'
+import type { PeerId } from '@libp2p/interface-peer-id'
 
-export function dedupeAddresses (...addresses: Array<Address | AddressPB | undefined>): AddressPB[] {
-  const addressMap = new Map<string, AddressPB>()
+export async function dedupeFilterAndSortAddresses (peerId: PeerId, filter: AddressFilter, addresses: Array<Address | AddressPB | undefined>): Promise<AddressPB[]> {
+  const addressMap = new Map<string, Address>()
 
-  addresses.forEach(addr => {
+  for (const addr of addresses) {
     if (addr == null) {
-      return
+      continue
     }
 
     if (addr.multiaddr instanceof Uint8Array) {
@@ -15,7 +17,11 @@ export function dedupeAddresses (...addresses: Array<Address | AddressPB | undef
     }
 
     if (!isMultiaddr(addr.multiaddr)) {
-      return
+      continue
+    }
+
+    if (!(await filter(peerId, addr.multiaddr))) {
+      continue
     }
 
     const isCertified = addr.isCertified ?? false
@@ -23,16 +29,21 @@ export function dedupeAddresses (...addresses: Array<Address | AddressPB | undef
     const existingAddr = addressMap.get(maStr)
 
     if (existingAddr != null) {
-      addr.isCertified = existingAddr.isCertified === true || isCertified
+      addr.isCertified = existingAddr.isCertified || isCertified
     } else {
       addressMap.set(maStr, {
-        multiaddr: addr.multiaddr.bytes,
+        multiaddr: addr.multiaddr,
         isCertified
       })
     }
-  })
+  }
 
-  return [...addressMap.values()].sort((a, b) => {
-    return a.multiaddr.toString().localeCompare(b.multiaddr.toString())
-  })
+  return [...addressMap.values()]
+    .sort((a, b) => {
+      return a.multiaddr.toString().localeCompare(b.multiaddr.toString())
+    })
+    .map(({ isCertified, multiaddr }) => ({
+      isCertified,
+      multiaddr: multiaddr.bytes
+    }))
 }
