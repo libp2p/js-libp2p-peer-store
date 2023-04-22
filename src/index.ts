@@ -60,9 +60,9 @@ export class PersistentPeerStore implements PeerStore {
     try {
       const output: Peer[] = []
 
-      await this.forEach(peer => {
+      for await (const peer of this.store.all()) {
         output.push(peer)
-      })
+      }
 
       return output
     } finally {
