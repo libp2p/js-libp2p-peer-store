@@ -16,6 +16,7 @@ import { CodeError } from '@libp2p/interfaces/errors'
 import { codes } from './errors.js'
 import type { Datastore } from 'interface-datastore'
 import type { PeerUpdate as PeerUpdateExternal } from '@libp2p/interface-libp2p'
+import mortice, { Mortice } from 'mortice'
 
 /**
  * Event detail emitted when peer data changes
@@ -27,10 +28,15 @@ export interface PeerUpdate extends PeerUpdateExternal {
 export class PersistentStore {
   private readonly peerId: PeerId
   private readonly datastore: Datastore
+  public readonly lock: Mortice
 
   constructor (components: PersistentPeerStoreComponents) {
     this.peerId = components.peerId
     this.datastore = components.datastore
+    this.lock = mortice({
+      name: 'peer-store',
+      singleProcess: true
+    })
   }
 
   async has (peerId: PeerId): Promise<boolean> {

@@ -5,6 +5,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Datastore } from 'interface-datastore'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Libp2pEvents } from '@libp2p/interface-libp2p'
+import { logger } from '@libp2p/logger'
+
+const log = logger('libp2p:peer-store')
 
 export interface PersistentPeerStoreComponents {
   peerId: PeerId
@@ -35,55 +38,127 @@ export class PersistentPeerStore implements PeerStore {
   }
 
   async forEach (fn: (peer: Peer) => void): Promise<void> {
-    for await (const peer of this.store.all()) {
-      fn(peer)
+    log.trace('forEach await read lock')
+    const release = await this.store.lock.readLock()
+    log.trace('forEach got read lock')
+
+    try {
+      for await (const peer of this.store.all()) {
+        fn(peer)
+      }
+    } finally {
+      log.trace('forEach release read lock')
+      release()
     }
   }
 
   async all (): Promise<Peer[]> {
-    const output: Peer[] = []
+    log.trace('all await read lock')
+    const release = await this.store.lock.readLock()
+    log.trace('all got read lock')
 
-    await this.forEach(peer => {
-      output.push(peer)
-    })
+    try {
+      const output: Peer[] = []
 
-    return output
+      await this.forEach(peer => {
+        output.push(peer)
+      })
+
+      return output
+    } finally {
+      log.trace('all release read lock')
+      release()
+    }
   }
 
   async delete (peerId: PeerId): Promise<void> {
-    await this.store.delete(peerId)
+    log.trace('delete await write lock')
+    const release = await this.store.lock.writeLock()
+    log.trace('delete got write lock')
+
+    try {
+      await this.store.delete(peerId)
+    } finally {
+      log.trace('delete release write lock')
+      release()
+    }
   }
 
   async has (peerId: PeerId): Promise<boolean> {
-    return await this.store.has(peerId)
+    log.trace('has await read lock')
+    const release = await this.store.lock.readLock()
+    log.trace('has got read lock')
+
+    try {
+      return await this.store.has(peerId)
+    } finally {
+      log.trace('has release read lock')
+      release()
+    }
   }
 
   async get (peerId: PeerId): Promise<Peer> {
-    return await this.store.load(peerId)
+    log.trace('get await read lock')
+    const release = await this.store.lock.readLock()
+    log.trace('get got read lock')
+
+    try {
+      return await this.store.load(peerId)
+    } finally {
+      log.trace('get release read lock')
+      release()
+    }
   }
 
   async save (id: PeerId, data: PeerData): Promise<Peer> {
-    const result = await this.store.save(id, data)
+    log.trace('save await write lock')
+    const release = await this.store.lock.writeLock()
+    log.trace('save got write lock')
 
-    this.#emitIfUpdated(id, result)
+    try {
+      const result = await this.store.save(id, data)
 
-    return result.peer
+      this.#emitIfUpdated(id, result)
+
+      return result.peer
+    } finally {
+      log.trace('save release write lock')
+      release()
+    }
   }
 
   async patch (id: PeerId, data: PeerData): Promise<Peer> {
-    const result = await this.store.patch(id, data)
+    log.trace('patch await write lock')
+    const release = await this.store.lock.writeLock()
+    log.trace('patch got write lock')
 
-    this.#emitIfUpdated(id, result)
+    try {
+      const result = await this.store.patch(id, data)
 
-    return result.peer
+      this.#emitIfUpdated(id, result)
+
+      return result.peer
+    } finally {
+      log.trace('patch release write lock')
+      release()
+    }
   }
 
   async merge (id: PeerId, data: PeerData): Promise<Peer> {
-    const result = await this.store.merge(id, data)
+    log.trace('merge await write lock')
+    const release = await this.store.lock.writeLock()
+    log.trace('merge got write lock')
 
-    this.#emitIfUpdated(id, result)
+    try {
+      const result = await this.store.merge(id, data)
 
-    return result.peer
+      this.#emitIfUpdated(id, result)
+
+      return result.peer
+    } finally {
+      log.trace('merge release write lock')
+      release()
+    }
   }
 
   #emitIfUpdated (id: PeerId, result: PeerUpdate): void {
