@@ -67,20 +67,6 @@ describe('dedupe-addresses', () => {
     }])
   })
 
-  it('should survive deduping garbage addresses', async () => {
-    expect(await dedupeFilterAndSortAddresses(peerId, async () => true, [{
-      multiaddr: addr1,
-      isCertified: false
-    // @ts-expect-error invalid params
-    }, {}, 'hello', 5, undefined, {
-      multiaddr: addr1,
-      isCertified: false
-    }])).to.deep.equal([{
-      multiaddr: addr1.bytes,
-      isCertified: false
-    }])
-  })
-
   it('should filter addresses', async () => {
     expect(await dedupeFilterAndSortAddresses(peerId, async () => false, [{
       multiaddr: addr1,

@@ -3,6 +3,8 @@ import type { Address as AddressPB } from '../pb/peer.js'
 import type { Address } from '@libp2p/interface-peer-store'
 import type { AddressFilter } from '../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { CodeError } from '@libp2p/interfaces/errors'
+import { codes } from '../errors.js'
 
 export async function dedupeFilterAndSortAddresses (peerId: PeerId, filter: AddressFilter, addresses: Array<Address | AddressPB | undefined>): Promise<AddressPB[]> {
   const addressMap = new Map<string, Address>()
@@ -17,7 +19,7 @@ export async function dedupeFilterAndSortAddresses (peerId: PeerId, filter: Addr
     }
 
     if (!isMultiaddr(addr.multiaddr)) {
-      continue
+      throw new CodeError('Multiaddr was invalid', codes.ERR_INVALID_PARAMETERS)
     }
 
     if (!(await filter(peerId, addr.multiaddr))) {

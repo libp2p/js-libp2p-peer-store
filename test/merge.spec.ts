@@ -99,7 +99,8 @@ describe('merge', () => {
         addr2
       ],
       metadata: {
-        foo: Uint8Array.from([0, 1, 2])
+        foo: Uint8Array.from([0, 1, 2]),
+        baz: Uint8Array.from([6, 7, 8])
       },
       tags: {
         tag1: { value: 10 }
@@ -113,7 +114,8 @@ describe('merge', () => {
     const original = await peerStore.save(otherPeerId, peer)
     const updated = await peerStore.merge(otherPeerId, {
       metadata: {
-        bar: Uint8Array.from([3, 4, 5])
+        bar: Uint8Array.from([3, 4, 5]),
+        baz: undefined
       }
     })
 
@@ -141,7 +143,8 @@ describe('merge', () => {
         foo: Uint8Array.from([0, 1, 2])
       },
       tags: {
-        tag1: { value: 10 }
+        tag1: { value: 10 },
+        tag3: { value: 50 }
       },
       protocols: [
         '/foo/bar'
@@ -152,7 +155,8 @@ describe('merge', () => {
     const original = await peerStore.patch(otherPeerId, peer)
     const updated = await peerStore.merge(otherPeerId, {
       tags: {
-        tag2: { value: 20 }
+        tag2: { value: 20 },
+        tag3: undefined
       }
     })
 

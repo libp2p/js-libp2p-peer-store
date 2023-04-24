@@ -6,16 +6,13 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { AddressFilter, PersistentPeerStoreComponents, PersistentPeerStoreInit } from './index.js'
 import { equals as uint8ArrayEquals } from 'uint8arrays/equals'
 import { NAMESPACE_COMMON, peerIdToDatastoreKey } from './utils/peer-id-to-datastore-key.js'
-import { toDatastorePeer } from './utils/peer-data-to-datastore-peer.js'
-import { dedupeFilterAndSortAddresses } from './utils/dedupe-addresses.js'
-import { dedupeTags } from './utils/dedupe-tags.js'
-import { dedupeMetadata } from './utils/dedupe-metadata.js'
 import { bytesToPeer } from './utils/bytes-to-peer.js'
 import { CodeError } from '@libp2p/interfaces/errors'
 import { codes } from './errors.js'
 import type { Datastore } from 'interface-datastore'
 import type { PeerUpdate as PeerUpdateExternal } from '@libp2p/interface-libp2p'
 import mortice, { Mortice } from 'mortice'
+import { toPeerPB } from './utils/to-peer-pb.js'
 
 /**
  * Event detail emitted when peer data changes
@@ -64,8 +61,9 @@ export class PersistentStore {
       existingPeer
     } = await this.#findExistingPeer(peerId)
 
-    const peerPb: PeerPB = toDatastorePeer(peerId, data)
-    peerPb.addresses = await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), peerPb.addresses)
+    const peerPb: PeerPB = await toPeerPB(peerId, data, 'patch', {
+      addressFilter: this.addressFilter
+    })
 
     return await this.#saveIfDifferent(peerId, peerPb, existingBuf, existingPeer)
   }
@@ -76,18 +74,10 @@ export class PersistentStore {
       existingPeer
     } = await this.#findExistingPeer(peerId)
 
-    const peer = toDatastorePeer(peerId, data)
-
-    const peerPb: PeerPB = {
-      addresses: await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), [
-        ...((data.addresses != null || data.multiaddrs != null) ? peer.addresses : (existingPeer?.addresses ?? []))
-      ]),
-      protocols: (data.protocols != null) ? [...new Set(peer.protocols)] : [...new Set(existingPeer?.protocols)],
-      publicKey: peer.publicKey ?? existingPeer?.id.publicKey,
-      peerRecordEnvelope: peer.peerRecordEnvelope ?? existingPeer?.peerRecordEnvelope,
-      metadata: data.metadata != null ? peer.metadata : existingPeer?.metadata ?? new Map(),
-      tags: data.tags != null ? peer.tags : existingPeer?.tags ?? new Map()
-    }
+    const peerPb: PeerPB = await toPeerPB(peerId, data, 'patch', {
+      addressFilter: this.addressFilter,
+      existingPeer
+    })
 
     return await this.#saveIfDifferent(peerId, peerPb, existingBuf, existingPeer)
   }
@@ -98,18 +88,10 @@ export class PersistentStore {
       existingPeer
     } = await this.#findExistingPeer(peerId)
 
-    const peer = toDatastorePeer(peerId, data)
-    const peerPb: PeerPB = {
-      addresses: await dedupeFilterAndSortAddresses(peerId, this.addressFilter ?? (async () => true), [
-        ...(existingPeer?.addresses ?? []),
-        ...(peer.addresses ?? [])
-      ]),
-      protocols: [...new Set([...(existingPeer?.protocols ?? []), ...peer.protocols])],
-      publicKey: peer.publicKey ?? existingPeer?.id.publicKey,
-      peerRecordEnvelope: peer.peerRecordEnvelope ?? existingPeer?.peerRecordEnvelope,
-      metadata: dedupeMetadata(peer.metadata, existingPeer?.metadata),
-      tags: dedupeTags(peer.tags, existingPeer?.tags)
-    }
+    const peerPb: PeerPB = await toPeerPB(peerId, data, 'merge', {
+      addressFilter: this.addressFilter,
+      existingPeer
+    })
 
     return await this.#saveIfDifferent(peerId, peerPb, existingBuf, existingPeer)
   }
@@ -151,18 +133,6 @@ export class PersistentStore {
   }
 
   async #saveIfDifferent (peerId: PeerId, peer: PeerPB, existingBuf?: Uint8Array, existingPeer?: Peer): Promise<PeerUpdate> {
-    // sort fields before write so bytes are consistent
-    peer.protocols = peer.protocols.sort((a, b) => {
-      return a.localeCompare(b)
-    })
-    peer.metadata = sortMapByKeys(peer.metadata)
-    peer.tags = sortMapByKeys(peer.tags)
-
-    // Ed25519 and secp256k1 have their public key embedded in them so no need to duplicate it
-    if (peerId.type !== 'RSA') {
-      delete peer.publicKey
-    }
-
     const buf = PeerPB.encode(peer)
 
     if (existingBuf != null && uint8ArrayEquals(buf, existingBuf)) {
@@ -181,20 +151,4 @@ export class PersistentStore {
       updated: true
     }
   }
-}
-
-/**
- * In JS maps are ordered by insertion order so create a new map with the
- * keys inserted in alphabetical order.
- */
-function sortMapByKeys <V> (map: Map<string, V>): Map<string, V> {
-  const output = new Map()
-
-  for (const key of [...map.keys()].sort((a, b) => {
-    return a.localeCompare(b)
-  })) {
-    output.set(key, map.get(key))
-  }
-
-  return output
 }

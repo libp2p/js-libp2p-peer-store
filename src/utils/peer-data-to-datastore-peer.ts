@@ -4,7 +4,7 @@ import { codes } from '../errors.js'
 import { isMultiaddr } from '@multiformats/multiaddr'
 import type { Peer as PeerPB } from '../pb/peer.js'
 import { equals as uint8arrayEquals } from 'uint8arrays/equals'
-import type { PeerData, TagOptions } from '@libp2p/interface-peer-store'
+import type { PeerData } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 export function toDatastorePeer (peerId: PeerId, data: PeerData): PeerPB {
@@ -50,43 +50,41 @@ export function toDatastorePeer (peerId: PeerId, data: PeerData): PeerPB {
 
   // remove invalid metadata
   if (data.metadata != null) {
-    if (data.metadata instanceof Map) {
-      output.metadata = data.metadata
-    } else {
-      for (const [key, value] of Object.entries(data.metadata)) {
-        output.metadata.set(key, value)
-      }
-    }
+    const metadataEntries = data.metadata instanceof Map ? data.metadata.entries() : Object.entries(data.metadata)
 
-    for (const key of output.metadata.keys()) {
+    for (const [key, value] of metadataEntries) {
       if (typeof key !== 'string') {
         throw new CodeError('Peer metadata keys must be strings', codes.ERR_INVALID_PARAMETERS)
       }
 
-      if (!(output.metadata.get(key) instanceof Uint8Array)) {
+      if (value == null) {
+        continue
+      }
+
+      if (!(value instanceof Uint8Array)) {
         throw new CodeError('Peer metadata values must be Uint8Arrays', codes.ERR_INVALID_PARAMETERS)
       }
+
+      output.metadata.set(key, value)
     }
   }
 
   if (data.tags != null) {
-    let tagOptions: Map<string, TagOptions>
+    const tagsEntries = data.tags instanceof Map ? data.tags.entries() : Object.entries(data.tags)
 
-    if (data.tags instanceof Map) {
-      tagOptions = data.tags
-    } else {
-      tagOptions = new Map()
-
-      for (const [key, value] of Object.entries(data.tags)) {
-        tagOptions.set(key, value)
+    for (const [key, value] of tagsEntries) {
+      if (typeof key !== 'string') {
+        throw new CodeError('Peer tag keys must be strings', codes.ERR_INVALID_PARAMETERS)
       }
-    }
 
-    for (const [key, options] of tagOptions.entries()) {
+      if (value == null) {
+        continue
+      }
+
       const tag = {
         name: key,
-        ttl: options.ttl,
-        value: options.value ?? 0
+        ttl: value.ttl,
+        value: value.value ?? 0
       }
 
       if (tag.value < 0 || tag.value > 100) {
