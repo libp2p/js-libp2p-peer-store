@@ -189,7 +189,6 @@ export class PersistentPeerStore implements PeerStore {
       const storedEnvelope = await RecordEnvelope.createFromProtobuf(peer.peerRecordEnvelope)
       const storedRecord = PeerRecord.createFromProtobuf(storedEnvelope.payload)
 
-      // ensure seq is greater than, or equal to, the last received
       if (storedRecord.seqNumber >= peerRecord.seqNumber) {
         log('sequence number was lower or equal to existing sequence number - stored: %d received: %d', storedRecord.seqNumber, peerRecord.seqNumber)
         return false
